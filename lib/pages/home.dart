@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -21,106 +23,28 @@ class _HomePageState extends State<HomePage> {
   // since they take some time to parse the geonjson it guess it's better to have one for each geojson file
   // representing the different level of details
   // and swap them based on zoom level
-  GeoJsonParser geoJsonParser = GeoJsonParser(
-    defaultMarkerColor: Colors.red,
-    defaultPolygonBorderColor: const Color.fromARGB(255, 73, 54, 244),
-    defaultPolygonFillColor: const Color.fromARGB(255, 54, 206, 244).withOpacity(0.2),
-    defaultCircleMarkerColor: const Color.fromARGB(255, 47, 76, 204).withOpacity(0.25),
-  );
 
-  GeoJsonParser geoJsonParserDet = GeoJsonParser(
-    defaultMarkerColor: Colors.red,
-    defaultPolygonBorderColor: const Color.fromARGB(255, 73, 54, 244),
-    defaultPolygonFillColor: const Color.fromARGB(255, 54, 206, 244).withOpacity(0.2),
-    defaultCircleMarkerColor: const Color.fromARGB(255, 47, 76, 204).withOpacity(0.25),
-  );
+
 
   bool loadingData = false;
   double mapZoom = 0.0;
-  dynamic polygons;
-  dynamic polygonsDet;
+  String zoomLevel = 'detailled';
+  Map<String, GeoJsonParser> geoParsers = {
+    'simple': GeoJsonParser(defaultMarkerColor: Colors.red,
+                            defaultPolygonBorderColor: const Color.fromARGB(255, 73, 54, 244),
+                            defaultPolygonFillColor: const Color.fromARGB(255, 54, 206, 244).withOpacity(0.2),
+                            defaultCircleMarkerColor: const Color.fromARGB(255, 47, 76, 204).withOpacity(0.25)),
+    'detailled': GeoJsonParser(defaultMarkerColor: Colors.red,
+                               defaultPolygonBorderColor: const Color.fromARGB(255, 73, 54, 244),
+                               defaultPolygonFillColor: const Color.fromARGB(255, 55, 233, 0).withOpacity(0.2),
+                               defaultCircleMarkerColor: const Color.fromARGB(255, 47, 76, 204).withOpacity(0.25))
+  };
+  final Map<String, List<Polygon<Object>>?> _cachedPolygonsObject = {
+    'simple': null,
+    'detailled': null,
+  };
 
 
-  bool myFilterFunction(Map<String, dynamic> properties) {
-    // can be use to avoid some geometries to be displayed
-    // it's usefull when u pull it from the web but probably not when pulled from a backend i guess
-    if (properties['section'].toString().contains('Point M-4')) {
-      return false;
-    } else {
-      return true;
-    }
-  }
-
-  Future<void> processData() async {
-    // Here we should get the geojson from a back end where we store it
-    final String geoJsonContent = await rootBundle.loadString('assets/geojsons/world_simplified.geojson');
-    final String geoJsonContentDet = await rootBundle.loadString('assets/geojsons/world.geojson');
-
-    geoJsonParser.parseGeoJsonAsString(geoJsonContent);
-    geoJsonParserDet.parseGeoJsonAsString(geoJsonContentDet);
-  }
-
-  @override
-  void initState() {
-    // can be use to avoid some geometries to be displayed
-    geoJsonParser.filterFunction = myFilterFunction;
-    geoJsonParserDet.filterFunction = myFilterFunction;
-    
-    // Set loadingData to true to display loader while JSON is being processed
-    // then assign the one of the two geoJsonParser to polygons state
-    loadingData = true;
-    final Stopwatch stopwatch2 = Stopwatch()..start();
-    processData().then((_) {
-      setState(() { // setState allow tochange values similar to react
-        loadingData = false;
-        polygons = geoJsonParserDet.polygons;
-      });
-      print('GeoJson Processing time: ${stopwatch2.elapsed}'); // ignore: avoid_print
-    });
-    super.initState();
-  }
-
-  void updateCameraZoom(MapCamera camera, bool hasGesture) {
-    // pretty straightforward, if the zoom is the same as the previous one, we don't do anything
-    // if the zoom pass a breakpoint we change the polygons sets
-
-    print('Camera zoom: ${camera.zoom}'); // ignore: avoid_print
-    print('HasGesture: $hasGesture'); // ignore: avoid_print
-    if (camera.zoom == mapZoom) return;
-
-    if (camera.zoom < 3 && mapZoom > 3) {
-      print('Load the simplfied map'); // ignore: avoid_print
-      setState(() {
-        polygons = geoJsonParser.polygons;
-      });
-    } else if (camera.zoom > 3 && mapZoom < 3) {
-      print('Load the detailled map'); // ignore: avoid_print
-      setState(() {
-        polygons = geoJsonParserDet.polygons;
-      });
-    }
-
-    setState(() {
-      mapZoom = camera.zoom;
-    });
-  }
-
-  List<Polygon<Object>> buildPolygons() {
-    int idx = 0;
-
-    return polygons.map<Polygon<Object>>((polygon) {
-      idx++;
-      return Polygon<Object>(
-        points: polygon.points,
-        color: polygon.color,
-        borderColor: polygon.borderColor,
-        borderStrokeWidth: polygon.borderStrokeWidth,
-        label: polygon.label,
-        hitValue: idx, //* hit value paseed to the polygonLayer when the polygon is hit
-      );
-    }).toList();
-  }
-  
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -142,9 +66,7 @@ class _HomePageState extends State<HomePage> {
                   const LatLng(90, 180),
                 ),
               ),
-              onPositionChanged: (camera, hasGesture) => { 
-                updateCameraZoom(camera, hasGesture)
-              },
+              onPositionChanged: (camera, hasGesture) => updateCameraZoom(camera),
               onTap: (_, __) => hitNotifier.value = null, // reset hitNotifier when the map is tapped without any event triggererd
             ),
             children: [
@@ -202,5 +124,89 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
     );
+  }
+
+  List<Polygon<Object>> buildPolygons() {
+    if (loadingData) return [];
+
+    if (_cachedPolygonsObject[zoomLevel] == null) {
+      int idx = 0;
+      _cachedPolygonsObject[zoomLevel] = geoParsers[zoomLevel]!.polygons.map((polygon) {
+        idx++;
+        return Polygon<Object>(
+          points: polygon.points,
+          color: polygon.color,
+          borderColor: polygon.borderColor,
+          borderStrokeWidth: polygon.borderStrokeWidth,
+          label: polygon.label,
+          hitValue: idx, //* hit value paseed to the polygonLayer when the polygon is hit
+        );
+      }).toList();
+    }
+
+    return _cachedPolygonsObject[zoomLevel]!;
+  }
+
+  @override
+  void initState() {
+    // can be use to avoid some geometries to be displayed
+    //geoParsers['simple']!.filterFunction = myFilterFunction;
+    
+    // Set loadingData to true to display loader while JSON is being processed
+    loadingData = true;
+    final Stopwatch stopwatch2 = Stopwatch()..start();
+    processData().then((_) {
+      setState(() { // setState allow tochange values similar to react
+        loadingData = false;
+      });
+      print('GeoJson Processing time: ${stopwatch2.elapsed}');
+    });
+    super.initState();
+  }
+
+  bool myFilterFunction(Map<String, dynamic> properties) {
+    // can be use to avoid some geometries to be displayed
+    // it's usefull when u pull it from the web but probably not when pulled from a backend i guess
+    if (properties['section'].toString().contains('Point M-4')) {
+      return false;
+    } else {
+      return true;
+    }
+  }
+
+  Future<void> processData() async {
+    // Here we should get the geojson from a back end where we store it
+    final String geoJsonContent = await rootBundle.loadString('assets/geojsons/world_simplified.geojson');
+    final String geoJsonContentDet = await rootBundle.loadString('assets/geojsons/world.geojson');
+
+    geoParsers['simple']!.parseGeoJsonAsString(geoJsonContent);
+    geoParsers['detailled']!.parseGeoJsonAsString(geoJsonContentDet);
+  }
+  
+  void updateCameraZoom(MapCamera camera) {
+    // If the zoom is the same as the previous one, we don't do anything
+    // if the zoom pass a breakpoint we change the zoomLevel state
+    // then update the new zoom state
+    const int zoomBreakPoint = 3;
+    print('Camera zoom: ${camera.zoom}');
+    if (camera.zoom == mapZoom) return;
+
+    if (camera.zoom < zoomBreakPoint && mapZoom > zoomBreakPoint) {
+      setState(() {
+        zoomLevel = 'simple';
+      });
+    } else if (camera.zoom > zoomBreakPoint && mapZoom < zoomBreakPoint) {
+      setState(() {
+        zoomLevel = 'detailled';
+      });
+    }
+
+    setState(() {
+      mapZoom = camera.zoom;
+    });
+  }
+
+  void clearPolygonCache(String level) {
+    _cachedPolygonsObject[level] = null;
   }
 }

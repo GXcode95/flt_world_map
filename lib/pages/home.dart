@@ -17,18 +17,14 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {  
   final LayerHitNotifier hitNotifier = ValueNotifier(null); 
-
-  // GeoJsonParser is a class that allow to parse a geoJson file and return a list of polygons
-  // it can track all information about the polygons rendering (color, border color, border width, label, points)
-  // since they take some time to parse the geonjson it guess it's better to have one for each geojson file
-  // representing the different level of details
-  // and swap them based on zoom level
-
-
-
   bool loadingData = false;
   double mapZoom = 0.0;
   String zoomLevel = 'detailled';
+  /// GeoJsonParser is a class that allow to parse a geoJson file and return a list of polygons
+    /// it can track all information about the polygons rendering (color, border color, border width, label, points)
+    /// since they take some time to parse the geonjson it guess it's better to have one for each geojson file
+    /// representing the different level of details
+    /// and swap them based on zoom level
   Map<String, GeoJsonParser> geoParsers = {
     'simple': GeoJsonParser(defaultMarkerColor: Colors.red,
                             defaultPolygonBorderColor: const Color.fromARGB(255, 73, 54, 244),
@@ -39,7 +35,7 @@ class _HomePageState extends State<HomePage> {
                                defaultPolygonFillColor: const Color.fromARGB(255, 55, 233, 0).withOpacity(0.2),
                                defaultCircleMarkerColor: const Color.fromARGB(255, 47, 76, 204).withOpacity(0.25))
   };
-  final Map<String, List<Polygon<Object>>?> _cachedPolygonsObject = {
+  final Map<String, List<Polygon>?> _cachedPolygonsObject = {
     'simple': null,
     'detailled': null,
   };
@@ -52,10 +48,10 @@ class _HomePageState extends State<HomePage> {
         children: [
           FlutterMap(
 // -------------------------------------------------------
-//* Map options define the map position and behavior
-//* allow handle the camera limitation, and event directly on the map, and probably other things
+  /// Map options define the map position and behavior
+  /// allow handle the camera limitation, and event directly on the map, and probably other things
 
-//* more about global event listening: https://docs.fleaflet.dev/usage/programmatic-interaction/listen-to-events
+  /// more about global event listening: https://docs.fleaflet.dev/usage/programmatic-interaction/listen-to-events
 //-------------------------------------------------------
             options: MapOptions(
               initialCenter: const LatLng(51.5, -0.09),
@@ -70,55 +66,59 @@ class _HomePageState extends State<HomePage> {
               onTap: (_, __) => hitNotifier.value = null, // reset hitNotifier when the map is tapped without any event triggererd
             ),
             children: [
+              Builder(
+                builder: (context) {
+                  final visibleBounds = MapCamera.of(context).visibleBounds;
 // ---------------------------------------------------------
-//* here we use MouseRegion() to detect the mouse hoverevents
-//* the event detected is defered to childs so if a child trigger the same event, it's the child one which has the priority
-//* The GestureDetector() is used to detect the click event
-//* (can also detect more, but here onTap listen only for tapEvent)
-//* Wrap a GestureDetector() with a MouseRegion() to detect the mouse hover events and the click event together is a common pattern
-//* it's more or less equivalent to onHover + onClick in react
-//* or to set eventListeners for mouseover, mouseout, mousemove and click in vanilla JS
+  /// here we use MouseRegion() to detect the mouse hoverevents
+  /// the event detected is defered to childs so if a child trigger the same event, it's the child one which has the priority
+  /// The GestureDetector() is used to detect the click event
+  /// (can also detect more, but here onTap listen only for tapEvent)
+  /// Wrap a GestureDetector() with a MouseRegion() to detect the mouse hover events and the click event together is a common pattern
+  /// it's more or less equivalent to onHover + onClick in react
+  /// or to set eventListeners for mouseover, mouseout, mousemove and click in vanilla JS
 // ---------------------------------------------------------
-              MouseRegion(
-                hitTestBehavior: HitTestBehavior.deferToChild,
-                cursor: SystemMouseCursors.click, // change the appearance of the cursor
-                child: GestureDetector(
-                  onTap: () {
-                    final LayerHitResult? hitResult = hitNotifier.value;
-                    if (hitResult == null) return;
-                    
-                    // hitValues: the hitValues of all elements that were hit,
-                    // ordered by their corresponding element,
-                    // first-to-last, visually top-to-bottom
-                    print('${hitResult.hitValues}');
-                  },
+                  return MouseRegion(
+                    hitTestBehavior: HitTestBehavior.deferToChild,
+                    cursor: SystemMouseCursors.click, // change the appearance of the cursor
+                    child: GestureDetector(
+                      onTap: () {
+                        final LayerHitResult? hitResult = hitNotifier.value;
+                        if (hitResult == null) return;
+                        
+                        /// hitValues: the hitValues of all elements that were hit,
+                        /// ordered by their corresponding element,
+                        /// first-to-last, visually top-to-bottom
+                        print('${hitResult.hitValues}');
+                      },
 // ---------------------------------------------------------
-// * Polygons are widget that allow to create vector shapes and can be rendered.
-//* The polygons doesn't handle interactions.
-//* It's about having a separation between the rendering and the interactions (and prob also perf).
+  /// Polygons are widget that allow to create vector shapes and can be rendered.
+  /// The polygons doesn't handle interactions.
+  /// It's about having a separation between the rendering and the interactions (and prob also perf).
 
-//* To handle intreactions we need to use interactions widget like the hitNotifier
-//* But to avoid using a lot of hitNotifier, we wrap the polygons in a PolygonLayer.
-//* The PolygonLayer represent a group a polygon and can have a hit notifier,
-//* so the polygonLayer (and polygons) handle the rendering and the hitNotifier handle the interactions.
+  /// To handle intreactions we need to use interactions widget like the hitNotifier
+  /// But to avoid using a lot of hitNotifier, we wrap the polygons in a PolygonLayer.
+  /// The PolygonLayer represent a group a polygon and can have a hit notifier,
+  /// so the polygonLayer (and polygons) handle the rendering and the hitNotifier handle the interactions.
 
-//* Each polygon have a hitValue, which is a unique identifier for the polygon.
-//* when a polygon is hit, the hitValue is passed to the hitNotifier.
-//* It mean that the PolygonLayer, which is linked to the hitNotifier, now have the information of which polygon is hit.
-//* So we can retrieve this value in the onTap event of the GestureDetector. -> (JUST ABOVE THIS COMMENT)
-//* (which is triggered everytime a tap event happens, even if it doesn't hit a hitNotifier)
+  /// Each polygon have a hitValue, which is a unique identifier for the polygon.
+  /// when a polygon is hit, the hitValue is passed to the hitNotifier.
+  /// It mean that the PolygonLayer, which is linked to the hitNotifier, now have the information of which polygon is hit.
+  /// So we can retrieve this value in the onTap event of the GestureDetector. -> (JUST ABOVE THIS COMMENT)
+  /// (which is triggered everytime a tap event happens, even if it doesn't hit a hitNotifier)
 
-//* More about Layers event handling: https://docs.fleaflet.dev/layers/layer-interactivity
+  /// More about Layers event handling: https://docs.fleaflet.dev/layers/layer-interactivity
 // ---------------------------------------------------------
-
-                  child: PolygonLayer(
-                    simplificationTolerance: 0, // do not simplify polygons, more precise, less performant
-                    useAltRendering: true, // prevent artefacts, but less performant
-                    polygons: buildPolygons(),
-                    hitNotifier: hitNotifier,
-                  ),
-                ),
-              ),
+                      child: PolygonLayer(
+                        simplificationTolerance: 0, // do not simplify polygons, more precise, less performant
+                        useAltRendering: true, // prevent artefacts, but less performant
+                        polygons: buildPolygons(visibleBounds),
+                        hitNotifier: hitNotifier,
+                      ),
+                    ),
+                  );
+                }
+              )
             ],
           ),
         ],
@@ -126,25 +126,34 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  List<Polygon<Object>> buildPolygons() {
+  List<Polygon> buildPolygons(LatLngBounds? visibleBounds) {
     if (loadingData) return [];
 
     if (_cachedPolygonsObject[zoomLevel] == null) {
       int idx = 0;
       _cachedPolygonsObject[zoomLevel] = geoParsers[zoomLevel]!.polygons.map((polygon) {
         idx++;
-        return Polygon<Object>(
+        return Polygon(
           points: polygon.points,
           color: polygon.color,
           borderColor: polygon.borderColor,
           borderStrokeWidth: polygon.borderStrokeWidth,
           label: polygon.label,
-          hitValue: idx, //* hit value paseed to the polygonLayer when the polygon is hit
+          hitValue: idx, /// hit value paseed to the polygonLayer when the polygon is hit
         );
       }).toList();
     }
 
-    return _cachedPolygonsObject[zoomLevel]!;
+    /// here we track the visible polygons using visibleBounds (coordinates of the screen's edge)
+    /// Then we sort the _cachedPolygons to return (and render) only the visiblePolygons
+    if (visibleBounds == null) return _cachedPolygonsObject[zoomLevel]!;
+
+    var visiblePolygons = _cachedPolygonsObject[zoomLevel]!
+        .where((polygon) => isPolygonVisible(polygon, visibleBounds))
+        .toList();
+    print('visible polygons length: ${visiblePolygons.length}');
+    print('cached polygons length: ${_cachedPolygonsObject[zoomLevel]!.length}');
+    return visiblePolygons;
   }
 
   @override
@@ -207,6 +216,15 @@ class _HomePageState extends State<HomePage> {
   }
 
   void clearPolygonCache(String level) {
+    /// Unsed yet but it good practice to have the ability to clean the cache if needed
+    /// Maybe we'll need to use it to udpat the color of a polygon
+    /// maybe we can just find the polygon in the _cachedPolygons and rebuild only this one.
     _cachedPolygonsObject[level] = null;
+  }
+
+  bool isPolygonVisible(Polygon polygon, LatLngBounds visibleBounds) {
+    return polygon.points.any((point) {
+      return visibleBounds.contains(point);
+    });
   }
 }

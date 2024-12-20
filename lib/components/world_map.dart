@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:flt_app/misc/geojson_parser.dart';
 import 'package:flt_app/components/territory.dart';
 import 'package:latlong2/latlong.dart';
 
 class WorldMap extends StatefulWidget {
-  final Map<String, GeoJsonParser> geoDatas;
-
-  const WorldMap({super.key, required this.geoDatas });
+  const WorldMap({super.key});
 
   @override
   State<WorldMap> createState() => _WorldMapState();
@@ -38,7 +35,7 @@ class _WorldMapState extends State<WorldMap> {
                 child:  PolygonLayer(
                   simplificationTolerance: 0, // do not simplify polygons, more precise, less performant
                   useAltRendering: true, // prevent artefacts, but less performant
-                  polygons: buildTerritories(visibleBounds, widget.geoDatas),
+                  polygons: buildTerritories(visibleBounds),
                   hitNotifier: hitNotifier,
                 ) 
               ),
@@ -74,10 +71,10 @@ class _WorldMapState extends State<WorldMap> {
     
     print('${hitResult.hitValues}');
 
-    List targets = Territory.getByDetail(detailLevel).where((territory) => 
-      territory.id == hitResult.hitValues[0]
-    ).toList();
+    Territory tappedTerritory = Territory.getById(hitResult.hitValues[0] as int);
+    List<Territory> targets = Territory.getWhereIso3(tappedTerritory.iso3);
     
+
     for (var target in targets) {
       print('${target.getIso3()} - ${target.getId()}');
       Territory(
@@ -120,14 +117,14 @@ class _WorldMapState extends State<WorldMap> {
     });
   }
 
-  List<Territory> buildTerritories(LatLngBounds? visibleBounds, Map<String, GeoJsonParser> geoDatas) {
+  List<Territory> buildTerritories(LatLngBounds? visibleBounds) {
     if (visibleBounds == null) return Territory.getByDetail(detailLevel);
 
     var visibleTerritories = Territory.getByDetail(detailLevel)
       .where((territory) => territory.isVisible(visibleBounds))
       .toList();
-    print('visible polygons length: ${visibleTerritories.length}');
-    print('cached polygons length: ${Territory.getByDetail(detailLevel).length}');
+    //print('visible polygons length: ${visibleTerritories.length}');
+    //print('cached polygons length: ${Territory.getByDetail(detailLevel).length}');
     
     return visibleTerritories;
   }

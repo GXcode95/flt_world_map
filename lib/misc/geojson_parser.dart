@@ -24,6 +24,7 @@ class GeoJsonParser {
   /// list of [Territory] objects created as result of parsing
   final List<Territory> polygons = [];
 
+  int _idIndex = 0;
    /// user defined callback function that creates a [Territory] object
   TerritoryCreationCallback? territoryCreationCallback;
 
@@ -79,6 +80,10 @@ class GeoJsonParser {
   /// set default [Territory] setting whether polygon is filled
   set setDefaultTerritoryIsFilled(bool filled) {
     defaultTerritoryIsFilled = filled;
+  }
+
+  void setGeojsonDetails(String value) {
+    geoJsonDetails = value; 
   }
 
   /// main GeoJson parsing function
@@ -163,7 +168,7 @@ class GeoJsonParser {
   /// default callback function for creating [Territory]
   Territory createDefaultTerritory(List<LatLng> outerRing,
       List<List<LatLng>>? holesList, Map<String, dynamic> properties) {
-    return Territory(
+    return Territory.findOrCreate(
       points: outerRing,
       holePointsList: holesList,
       borderColor: defaultTerritoryBorderColor!,
@@ -172,7 +177,7 @@ class GeoJsonParser {
       borderStrokeWidth: defaultTerritoryBorderStroke!,
       iso3: properties['iso3'],
       detailLevel: geoJsonDetails,
-      id: properties['id'],
+      id: _idIndex += 1,
     );
   }
 

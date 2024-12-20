@@ -3,17 +3,19 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
 class Territory extends Polygon {
-  final String iso3;
-  final String detailLevel;
-  final int id;
-
   static final Map<String, List<Territory>> _cache = <String, List<Territory>>{
     'simple': [],
     'detailled': [],
   };
 
-  // Constructors ------------------------
+  static final List<Territory> _singletons = [];
+  
+  final String iso3;
+  final String detailLevel;
+  final int id;
 
+  
+// Constructors ------------------------
   factory Territory({
     required int id,
     required List<LatLng> points,
@@ -25,11 +27,6 @@ class Territory extends Polygon {
     String? label,
     List<List<LatLng>>? holePointsList,
   }) {
-    // get the corresponding cache list
-    // if it doesn't exist, create it
-    // if it exists, check if the color is different
-    // if it is, create a new instance with the correct color and replace the old one in the cache.
-    // if it is the same, return the existing instance.
     return Territory.findOrCreate(
       id: id,
       points: points,
@@ -45,7 +42,7 @@ class Territory extends Polygon {
 
   // _ are private to the class scope
   // internal is a common name for a private constructor
-  // this coinstructor can be accessed only from within this class
+  // this constructor can be accessed only from within this class
   Territory._internal({
     required this.id,
     required super.points,
@@ -58,8 +55,7 @@ class Territory extends Polygon {
     required this.detailLevel,
   }) : super(hitValue: id);
 
-
-  // Class methods ----------------------
+// Class methods ----------------------
   static Territory findOrCreate({
     required int id,
     required List<LatLng> points,
@@ -71,6 +67,12 @@ class Territory extends Polygon {
     String? label,
     List<List<LatLng>>? holePointsList,
   }) {
+    // get the corresponding cache list
+    // if it doesn't exist, create it
+    // if it exists, check if the color is different
+    // if it is, create a new instance with the correct color and replace the old one in the cache.
+    // if it is the same, return the existing instance.
+
     final List<Territory> cacheList = _cache[detailLevel]!;
     final existingIndex = cacheList.indexWhere((territory) => territory.id == id);
 
@@ -92,9 +94,9 @@ class Territory extends Polygon {
         detailLevel: detailLevel,
       );
       cacheList[existingIndex] = updatedTerritory;
+      _singletons.add(updatedTerritory);
       return updatedTerritory;
     } else {
-      // Ajouter un nouveau Territory si inexistant dans le cache.
       final newTerritory = Territory._internal(
         id: id,
         points: points,
@@ -107,6 +109,7 @@ class Territory extends Polygon {
         detailLevel: detailLevel,
       );
       cacheList.add(newTerritory);
+      _singletons.add(newTerritory);
       return newTerritory;
     }
   }
@@ -115,8 +118,19 @@ class Territory extends Polygon {
     return _cache[detailLevel]!;
   }
 
-  // Getters ----------------------
-  
+  static List<Territory> all(){
+    return _singletons;
+  }
+
+  static Territory getById(int id) {
+    return all().firstWhere((territory) => territory.id == id);
+  }
+
+  static List<Territory> getWhereIso3(String iso3) {
+    return all().where((territory) => territory.iso3 == iso3).toList();
+  }
+
+// Getters ----------------------
   String getIso3(){
     return iso3;
   }
@@ -153,9 +167,7 @@ class Territory extends Polygon {
     return label;
   }
 
-
-  // Instance methods ------------------
-
+// Instance methods ------------------
   bool isVisible(LatLngBounds visibleBounds) {
     return points.any((point) => visibleBounds.contains(point));
   }

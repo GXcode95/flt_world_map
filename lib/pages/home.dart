@@ -16,26 +16,12 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {  
   bool loadingData = false;
 
-  Map<String, GeoJsonParser> geoParsers = {
-    'simple': GeoJsonParser(
-      geoJsonDetails: 'simple',
-      defaultTerritoryBorderColor: const Color.fromARGB(255, 73, 54, 244),
-      defaultTerritoryFillColor: const Color.fromARGB(255, 54, 206, 244).withOpacity(0.2),
-    ),
-
-    'detailled': GeoJsonParser(
-      geoJsonDetails: 'detailled',
-      defaultTerritoryBorderColor: const Color.fromARGB(255, 73, 54, 244),
-      defaultTerritoryFillColor: const Color.fromARGB(255, 55, 233, 0).withOpacity(0.2),
-    ),
-  };
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          loadingData ? const Text('Loading') : WorldMap(geoDatas: geoParsers),
+          loadingData ? const Text('Loading') : const WorldMap(),
         ],
       ),
     );
@@ -69,8 +55,14 @@ class _HomePageState extends State<HomePage> {
     final String geoJsonContent = await rootBundle.loadString('assets/geojsons/world_simplified.geojson');
     final String geoJsonContentDet = await rootBundle.loadString('assets/geojsons/world.geojson');
 
-    geoParsers['simple']!.parseGeoJsonAsString(geoJsonContent);
-    geoParsers['detailled']!.parseGeoJsonAsString(geoJsonContentDet);
+    GeoJsonParser parser = GeoJsonParser(
+      geoJsonDetails: 'simple',
+      defaultTerritoryBorderColor: const Color.fromARGB(255, 73, 54, 244),
+      defaultTerritoryFillColor: const Color.fromARGB(255, 54, 206, 244).withOpacity(0.2),
+    );
+    parser.parseGeoJsonAsString(geoJsonContent);
+    parser.setGeojsonDetails('detailled');
+    parser.parseGeoJsonAsString(geoJsonContentDet);
   }
   
 }

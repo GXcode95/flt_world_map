@@ -4,7 +4,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../components/territory.dart';
 
-typedef TerritoryCreationCallback = Territory Function(List<LatLng> points,
+typedef TerritoryCreationCallback = Territory Function(int id, List<LatLng> points,
     List<List<LatLng>>? holePointsList, Map<String, dynamic> properties);
 typedef FilterFunction = bool Function(Map<String, dynamic> properties);
 
@@ -24,7 +24,6 @@ class GeoJsonParser {
   /// list of [Territory] objects created as result of parsing
   final List<Territory> polygons = [];
 
-  int _idIndex = 0;
    /// user defined callback function that creates a [Territory] object
   TerritoryCreationCallback? territoryCreationCallback;
 
@@ -109,9 +108,12 @@ class GeoJsonParser {
             final List<LatLng> outerRing = [];
             final List<List<LatLng>> holesList = [];
             int pathIndex = 0;
-            for (final path in f['geometry']['coordinates'] as List) {
+            late int id;
+            for (final hashMap in f['geometry']['coordinates'] as List) {
               final List<LatLng> hole = [];
-              for (final coords in path as List<dynamic>) {
+              id = hashMap['id']; 
+              print(hashMap.values);
+              for (final coords in hashMap['path'] as List<dynamic>) {
                 if (pathIndex == 0) {
                   // add to polygon's outer ring
                   outerRing
@@ -128,18 +130,20 @@ class GeoJsonParser {
               pathIndex++;
             }
             polygons.add(territoryCreationCallback!(
-                outerRing, holesList, f['properties'] as Map<String, dynamic>));
+                id, outerRing, holesList, f['properties'] as Map<String, dynamic>));
           }
           break;
         case 'MultiPolygon':
           {
             for (final polygon in f['geometry']['coordinates'] as List) {
+              late int id;
               final List<LatLng> outerRing = [];
               final List<List<LatLng>> holesList = [];
               int pathIndex = 0;
-              for (final path in polygon as List) {
+              for (final hashMap in polygon as List) {
                 List<LatLng> hole = [];
-                for (final coords in path as List<dynamic>) {
+                id = hashMap['id'];
+                for (final coords in hashMap['path'] as List<dynamic>) {
                   if (pathIndex == 0) {
                     // add to polygon's outer ring
                     outerRing
@@ -155,7 +159,7 @@ class GeoJsonParser {
                 }
                 pathIndex++;
               }
-              polygons.add(territoryCreationCallback!(outerRing, holesList,
+              polygons.add(territoryCreationCallback!(id, outerRing, holesList,
                   f['properties'] as Map<String, dynamic>));
             }
           }
@@ -166,7 +170,7 @@ class GeoJsonParser {
   }
 
   /// default callback function for creating [Territory]
-  Territory createDefaultTerritory(List<LatLng> outerRing,
+  Territory createDefaultTerritory(int id, List<LatLng> outerRing,
       List<List<LatLng>>? holesList, Map<String, dynamic> properties) {
     return Territory.findOrCreate(
       points: outerRing,
@@ -177,7 +181,7 @@ class GeoJsonParser {
       borderStrokeWidth: defaultTerritoryBorderStroke!,
       iso3: properties['iso3'],
       detailLevel: geoJsonDetails,
-      id: _idIndex += 1,
+      id: id,
     );
   }
 
